@@ -1,3 +1,9 @@
+# zzal-delivery
+
+`zzal-delivery` is a simple telegram bot which delivers fresh images from [Safebooru](https://safebooru.org/) using their API. User can set their own query sets, which are just arrays of tags to search. You can fetch manually from bot or just simply waiting for their daily delivery.
+
+Currently this project is working in progress, so there is nothing but test boiler plate.
+
 # Develop Environment Setting
 
 install: `npm install`
