@@ -1,6 +1,10 @@
+import * as dayjs from 'dayjs'
 import * as dotenv from 'dotenv'
 import { Telegraf } from 'telegraf'
-import SafebooruService from './safebooru'
+import { QuerySet } from './model'
+import BatchService from './services/batch'
+import DBService from './services/db'
+import { setupBot } from './bot'
 
 // .env load
 const dotenvResult = dotenv.config()
@@ -14,19 +18,35 @@ if (dotenvResult.error) {
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN)
 
-bot.start((ctx) => {
-  ctx.reply('Welcome!')
-})
+// Enable graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'))
+process.once('SIGTERM', () => bot.stop('SIGTERM'))
+
+setupBot(bot)
 
 bot.launch()
 
-const testQuerySet = {
+// batch config
+BatchService.startBatch(() => {
+  const users = DBService.getUsers()
+  users.forEach((user) => {
+    user.querySets.forEach((querySet) => {
+      bot.telegram.sendMessage(
+        user.chatId,
+        `Your querySet is ${querySet.tags.join(', ')}`
+      )
+    })
+  })
+})
+
+const testQuerySet: QuerySet = {
   id: 'test',
   tags: ['ibuki_tsubasa', 'solo'],
+  deliveryTime: dayjs('9:00'),
 }
 
+/*
 ;(async () => {
-  console.log(
-    await SafebooruService.getImageList(testQuerySet, 0, 8)
-  )
+  console.log(await SafebooruService.getImageList(testQuerySet, 0, 8))
 })()
+*/

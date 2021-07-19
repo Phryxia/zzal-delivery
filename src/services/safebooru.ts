@@ -1,8 +1,8 @@
-import { QuerySet, SafebooruPostsResponse } from './model'
+import { QuerySet, SafebooruPostsResponse } from '../model'
 import axios from 'axios'
 import * as qs from 'query-string'
 import * as parser from 'fast-xml-parser'
-import { SAFEBOORU_API } from './const'
+import { SAFEBOORU_API } from '../const'
 
 async function getImageList(
   querySet: QuerySet,

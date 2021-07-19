@@ -1,3 +1,5 @@
+import * as dayjs from 'dayjs'
+
 export interface SafebooruPostsResponse {
   totalCount: number
   posts: SafebooruPost[]
@@ -26,13 +28,14 @@ export interface SafebooruPost {
 export interface QuerySet {
   id: string
   tags: string[]
+  deliveryTime: dayjs.Dayjs // use only hour and minute
 }
 
 export interface User {
   id: string
-  name: string
+  chatId: number
   querySets: QuerySet[]
-  isQueried: {
+  isImageQueried: {
     [imageId: string]: boolean
   }
   queriedImagesNumber: {
