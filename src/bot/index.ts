@@ -2,16 +2,17 @@ import { Context, Telegraf } from 'telegraf'
 import DBService from '../services/db'
 import * as dayjs from 'dayjs'
 import * as customParseFormat from 'dayjs/plugin/customParseFormat'
-import { getDurationInMillisecond } from '../util'
-import { Dialogue, DialogueType, GlobalSession } from './model'
-import { ADD_QUERY_SETS_DIALOGUE } from './dialogues'
+import { Dialogue, DialogueControl, DialogueType, GlobalSession } from './model'
+import { ADD_QUERY_SET_DIALOGUE, REMOVE_QUERY_SET_DIALOGUE } from './dialogues'
+import listQuerySets from './listQuerySets'
 
 dayjs.extend(customParseFormat)
 
 const globalSession: GlobalSession = {}
 
 const dialogues: { [type: string]: Dialogue } = {
-  [DialogueType.ADD_QUERY_SET]: ADD_QUERY_SETS_DIALOGUE,
+  [DialogueType.ADD_QUERY_SET]: ADD_QUERY_SET_DIALOGUE,
+  [DialogueType.REMOVE_QUERY_SET]: REMOVE_QUERY_SET_DIALOGUE,
 }
 
 function enterDialogue(chatId: number, type: DialogueType, context: Context) {
@@ -30,17 +31,24 @@ function leaveDialogue(chatId: number) {
   globalSession[chatId].dialogue.type = DialogueType.IDLE
 }
 
-function exectueDialogue(chatId: number, ctx: Context) {
+async function exectueDialogue(chatId: number, ctx: Context) {
   if (!globalSession[chatId]) return
 
   const { phase, type } = globalSession[chatId].dialogue
 
-  if (dialogues[type]?.steps[phase](ctx, globalSession[chatId])) {
-    moveToNextPhase(chatId)
+  switch (await dialogues[type]?.steps[phase](ctx, globalSession[chatId])) {
+    case DialogueControl.NEXT:
+      moveToNextPhase(chatId)
 
-    if (phase + 1 >= dialogues[type].steps.length) {
+      if (phase + 1 >= dialogues[type].steps.length) {
+        leaveDialogue(chatId)
+      }
+      break
+    case DialogueControl.REPEAT:
+      break
+    default:
       leaveDialogue(chatId)
-    }
+      break
   }
 }
 
@@ -76,31 +84,17 @@ export function setupBot(bot: Telegraf) {
 
     if (!user) return
 
-    if (user.querySets.length === 0) {
-      ctx.telegram.sendMessage(user.chatId, "You don't have any query set")
-      return
-    }
+    const response = await listQuerySets(user.querySets)
 
-    const sortedQuerySets = [...user.querySets].sort(
-      (qsA, qsB) =>
-        getDurationInMillisecond(qsA.deliveryTime) -
-        getDurationInMillisecond(qsB.deliveryTime)
-    )
-    const response =
-      'Your query sets\n' +
-      sortedQuerySets
-        .map((querySet) => {
-          return `${querySet.deliveryTime.format('hh:mm')}: ${querySet.tags
-            .map((tag) => `"${tag}"`)
-            .join(', ')}`
-        })
-        .join('\n')
-
-    ctx.telegram.sendMessage(user.chatId, response)
+    if (response) ctx.reply(response)
   })
 
   bot.command('addQuerySet', (ctx) => {
     enterDialogue(ctx.chat.id, DialogueType.ADD_QUERY_SET, ctx)
+  })
+
+  bot.command('removeQuerySet', (ctx) => {
+    enterDialogue(ctx.chat.id, DialogueType.REMOVE_QUERY_SET, ctx)
   })
 
   // Process dialogue

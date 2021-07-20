@@ -26,6 +26,8 @@ setupBot(bot)
 
 bot.launch()
 
+console.log('Server is now running...')
+
 // batch config
 BatchService.startBatch(() => {
   const users = DBService.getUsers()
