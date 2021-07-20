@@ -5,7 +5,7 @@ import { getDurationInMillisecond } from '../util'
 dayjs.extend(customParseFormat)
 
 let batchConfig = {
-  period: dayjs('00:00:10', 'hh:mm:ss'),
+  period: dayjs('00:00:20', 'hh:mm:ss'),
   timeOffset: dayjs('00:00:00', 'hh:mm:ss'),
 }
 
@@ -28,7 +28,7 @@ function getMillisecondDiffToNextBatch(currentTime?: dayjs.Dayjs): number {
   return td
 }
 
-function startBatch(callback: () => void) {
+function startBatch(callback: () => Promise<void>) {
   function runBatch() {
     callback()
     setTimeout(runBatch, getMillisecondDiffToNextBatch())

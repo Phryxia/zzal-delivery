@@ -3,6 +3,7 @@ import * as dayjs from 'dayjs'
 export interface SafebooruPostsResponse {
   totalCount: number
   posts: SafebooruPost[]
+  error?: string
 }
 
 export interface SafebooruPost {
@@ -42,3 +43,5 @@ export interface User {
     [querySetId: string]: number
   }
 }
+
+export const IMAGES_PER_PAGE = 8

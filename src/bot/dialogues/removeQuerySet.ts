@@ -10,7 +10,7 @@ export const REMOVE_QUERY_SET_DIALOGUE: Dialogue = {
   steps: [
     // Phase 0: announce and show the list of query sets
     async (ctx, session) => {
-      const user = DBService.getUser(ctx.chat.id)
+      const user = await DBService.getUser(ctx.chat.id)
 
       if (!user) return DialogueControl.ABORT
 

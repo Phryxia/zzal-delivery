@@ -1,10 +1,12 @@
-import { Context, Telegraf } from 'telegraf'
+import { Context, Telegraf, TelegramError } from 'telegraf'
 import DBService from '../services/db'
 import * as dayjs from 'dayjs'
 import * as customParseFormat from 'dayjs/plugin/customParseFormat'
 import { Dialogue, DialogueControl, DialogueType, GlobalSession } from './model'
 import { ADD_QUERY_SET_DIALOGUE, REMOVE_QUERY_SET_DIALOGUE } from './dialogues'
 import listQuerySets from './listQuerySets'
+import { deliverAll } from '../delivery'
+import { suppressError } from '../util'
 
 dayjs.extend(customParseFormat)
 
@@ -15,7 +17,27 @@ const dialogues: { [type: string]: Dialogue } = {
   [DialogueType.REMOVE_QUERY_SET]: REMOVE_QUERY_SET_DIALOGUE,
 }
 
+function createSession(chatId: number): void {
+  globalSession[chatId] = {
+    dialogue: {
+      type: DialogueType.IDLE,
+      phase: 0,
+    },
+    state: {},
+  }
+}
+
+function isSessionExist(chatId: number): boolean {
+  return !!globalSession[chatId]
+}
+
+function assureSession(chatId: number) {
+  if (!isSessionExist(chatId)) createSession(chatId)
+}
+
 function enterDialogue(chatId: number, type: DialogueType, context: Context) {
+  assureSession(chatId)
+
   const session = globalSession[chatId]
   session.dialogue.type = type
   session.dialogue.phase = 0
@@ -32,7 +54,7 @@ function leaveDialogue(chatId: number) {
 }
 
 async function exectueDialogue(chatId: number, ctx: Context) {
-  if (!globalSession[chatId]) return
+  if (!isSessionExist(chatId)) return
 
   const { phase, type } = globalSession[chatId].dialogue
 
@@ -54,39 +76,38 @@ async function exectueDialogue(chatId: number, ctx: Context) {
 
 export function setupBot(bot: Telegraf) {
   bot.start(async (ctx) => {
-    console.log('Welcome!')
-
-    let user = DBService.getUser(ctx.chat.id)
+    let user = await DBService.getUser(ctx.chat.id)
 
     // If there is no user, add one
     if (!user) {
       // DB
-      user = DBService.addUser(ctx.chat.id)
-
-      // Session
-      globalSession[ctx.chat.id] = {
-        dialogue: {
-          type: DialogueType.IDLE,
-          phase: 0,
-        },
-        state: {},
-      }
+      user = await DBService.addUser(ctx.chat.id)
     }
 
-    // ctx.telegram.sendPhoto(
-    //   ctx.chat.id,
-    //   'https://safebooru.org//samples/1822/sample_a07d8fec601379496af62fcc59d7f2e1ced5a5bb.jpg?3551335'
-    // )
+    suppressError(ctx.reply('Welcome! Check the manual using /help.'))
+  })
+
+  bot.command('help', (ctx) => {
+    suppressError(
+      ctx.reply(
+        '/help - show this.\n' +
+          "/listQuerySets - show your chat's query sets.\n" +
+          '/addQuerySet - add new query set for your chat.\n' +
+          '/removeQuerySet - remove existing query set for your chat.\n' +
+          "/deliver - use this when you don't want to wait it for tommorow.\n\n" +
+          "If you are first here, start with /addQuerySet. I'll help you."
+      )
+    )
   })
 
   bot.command('listQuerySets', async (ctx) => {
-    const user = DBService.getUser(ctx.chat.id)
+    const user = await DBService.getUser(ctx.chat.id)
 
     if (!user) return
 
     const response = await listQuerySets(user.querySets)
 
-    if (response) ctx.reply(response)
+    if (response) suppressError(ctx.reply(response))
   })
 
   bot.command('addQuerySet', (ctx) => {
@@ -95,6 +116,23 @@ export function setupBot(bot: Telegraf) {
 
   bot.command('removeQuerySet', (ctx) => {
     enterDialogue(ctx.chat.id, DialogueType.REMOVE_QUERY_SET, ctx)
+  })
+
+  bot.command('deliver', async (ctx) => {
+    const user = await DBService.getUser(ctx.chat.id)
+
+    if (!user) return
+
+    if (user.querySets.length === 0) {
+      suppressError(
+        ctx.reply(
+          `You don't have any query set to receive. Start adding your own query set using /addQuerySet.`
+        )
+      )
+      return
+    }
+
+    deliverAll(bot, user)
   })
 
   // Process dialogue

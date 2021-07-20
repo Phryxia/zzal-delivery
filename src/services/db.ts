@@ -14,15 +14,15 @@ let db: MockDB = {
 }
 
 // api
-function getUser(chatId: number): User | undefined {
+async function getUser(chatId: number): Promise<User | undefined> {
   return db.users.find((user) => user.chatId === chatId)
 }
 
-function getUsers(): User[] {
+async function getUsers(): Promise<User[]> {
   return db.users
 }
 
-function addUser(chatId: number): User {
+async function addUser(chatId: number): Promise<User> {
   const user: User = {
     id: `${db.userIdCounter++}`,
     chatId,
@@ -36,15 +36,34 @@ function addUser(chatId: number): User {
   return user
 }
 
-function removeUser(chatId: number): void {
+async function removeUser(chatId: number): Promise<void> {
   db.users = db.users.filter((user) => user.chatId !== chatId)
 }
 
-function addQuerySet(
+async function updateQueriedImagesNumber(
+  chatId: number,
+  querySetId: string,
+  value: number
+): Promise<void> {
+  const user = db.users.find((user) => user.chatId === chatId)
+  if (!user) return
+  user.queriedImagesNumber[querySetId] = value
+}
+
+async function addQueriedImages(
+  chatId: number,
+  imageIds: string[]
+): Promise<void> {
+  const user = db.users.find((user) => user.chatId === chatId)
+  if (!user) return
+  imageIds.forEach((imageId) => (user.isImageQueried[imageId] = true))
+}
+
+async function addQuerySet(
   chatId: number,
   tags: string[],
   deliveryTime: dayjs.Dayjs
-): void {
+): Promise<void> {
   const newQuerySet: QuerySet = {
     id: `${db.querySetIdCounter++}`,
     tags,
@@ -54,18 +73,16 @@ function addQuerySet(
 
   if (
     user &&
-    !user.querySets.some((querySet) =>
-      isEquivalent(querySet, newQuerySet)
-    )
+    !user.querySets.some((querySet) => isEquivalent(querySet, newQuerySet))
   ) {
     user.querySets.push(newQuerySet)
   }
 }
 
-function removeQuerySet(
+async function removeQuerySet(
   chatId: number,
   querySetId: string
-): void {
+): Promise<void> {
   const user = db.users.find((user) => user.chatId === chatId)
 
   if (user) {
@@ -89,6 +106,8 @@ export default {
   getUsers,
   addUser,
   removeUser,
+  updateQueriedImagesNumber,
+  addQueriedImages,
   addQuerySet,
   removeQuerySet,
 }

@@ -1,10 +1,9 @@
-import * as dayjs from 'dayjs'
 import * as dotenv from 'dotenv'
 import { Telegraf } from 'telegraf'
-import { QuerySet } from './model'
 import BatchService from './services/batch'
 import DBService from './services/db'
 import { setupBot } from './bot'
+import { deliverAll } from './delivery'
 
 // .env load
 const dotenvResult = dotenv.config()
@@ -24,31 +23,18 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'))
 
 setupBot(bot)
 
-bot.launch()
+// this bot doesn't need to process pending message
+// all it have to do is just response to command when it is on live
+bot.launch({
+  dropPendingUpdates: true,
+})
 
 console.log('Server is now running...')
 
 // batch config
-BatchService.startBatch(() => {
-  const users = DBService.getUsers()
+BatchService.startBatch(async () => {
+  const users = await DBService.getUsers()
   users.forEach((user) => {
-    user.querySets.forEach((querySet) => {
-      bot.telegram.sendMessage(
-        user.chatId,
-        `Your querySet is ${querySet.tags.join(', ')}`
-      )
-    })
+    deliverAll(bot, user)
   })
 })
-
-const testQuerySet: QuerySet = {
-  id: 'test',
-  tags: ['ibuki_tsubasa', 'solo'],
-  deliveryTime: dayjs('9:00'),
-}
-
-/*
-;(async () => {
-  console.log(await SafebooruService.getImageList(testQuerySet, 0, 8))
-})()
-*/
